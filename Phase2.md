@@ -1,35 +1,44 @@
-# Phase 2 Tutorial: Multi-Node Local Environment Setup
-
-**Phase:** 2  
-**Objective:** Set up a multi-node development environment with 3-4 local blockchain nodes (Hardhat), 3 local IPFS nodes (Docker), and a backend orchestrator for threat intelligence scanning.
+# Phase 2: Detailed Approach  
+**Multi-Node Local Environment Setup**
 
 ---
 
-## 1. Prerequisites
+## Objective
 
-- **Node.js** (v16+)
-- **npm** (v7+)
+To establish a robust local development environment simulating a decentralized storage and sharing system, consisting of:
+- **3-4 blockchain nodes** (using Hardhat, simulating a mini Ethereum network)
+- **3 IPFS nodes** (using Docker for decentralized storage)
+- **1 backend orchestrator** (Node.js, for threat intelligence scanning)
+
+This phase lays the technical groundwork for developing, testing, and demonstrating secure, decentralized file storage and sharing with on-chain permissions and threat scanning.
+
+---
+
+## 1. Environment Preparation
+
+### A. System Requirements
+
+- **Node.js (v16 or higher)**
+- **npm (v7 or higher)**
 - **Docker** (for IPFS nodes)
 - **Git**
-- **Basic terminal knowledge**
+- Adequate disk space and RAM for running multiple containers/nodes
 
----
-
-## 2. Directory Structure
+### B. Directory Structure
 
 ```
 project-root/
-  contracts/       # Solidity smart contracts & Hardhat config
-  backend/         # Node.js backend orchestrator
-  infra/           # (Optional) Docker Compose/scripts
-  docs/            # Documentation, tutorials
+  contracts/       # Smart contracts & Hardhat config
+  backend/         # Node.js backend for VirusTotal relay/API orchestration
+  infra/           # Docker Compose/scripts
+  docs/            # Documentation & tutorials
 ```
 
 ---
 
-## 3. Setup: 3-4 Local Blockchain Nodes (Hardhat)
+## 2. Blockchain Node Setup (3-4 Nodes with Hardhat)
 
-### A. Install and Initialize Hardhat
+### A. Initialize Hardhat Project
 
 ```bash
 mkdir contracts && cd contracts
@@ -37,48 +46,52 @@ npm init -y
 npm install --save-dev hardhat @nomicfoundation/hardhat-toolbox
 npx hardhat
 ```
-- When prompted, select: **Create a JavaScript project**.  
-- Accept defaults for other prompts.
+- Select **“Create a JavaScript project”** and accept the defaults.
 
-### B. Simulate Multiple Blockchain Nodes
+### B. Simulate Multi-Node Blockchain Network
 
-Hardhat’s built-in node simulates multiple accounts, but for true multi-node simulation, use either:
-- **(Recommended for dev/test):** Run multiple Hardhat nodes on different ports, each with its own data directory, or
-- **Advanced:** Setup a local Ethereum network, e.g., [Geth Clique](https://geth.ethereum.org/docs/interface/private-network) (optional for advanced decentralization).
-
-#### For most users, this approach is sufficient:
+#### **Option 1: Multiple Hardhat Nodes (Simple Simulation)**
 
 Open **3-4 terminals** and run in each:
 
 ```bash
-npx hardhat node --port 8545   # Terminal 1
-npx hardhat node --port 8546   # Terminal 2
-npx hardhat node --port 8547   # Terminal 3
-# (Optional) npx hardhat node --port 8548   # Terminal 4
+npx hardhat node --port 8545   # Node 1 (default)
+npx hardhat node --port 8546   # Node 2
+npx hardhat node --port 8547   # Node 3
+npx hardhat node --port 8548   # Node 4 (optional)
 ```
+- Each node simulates a local Ethereum node on a unique port.
+- **Leave all terminals running** for your "network".
 
-Each node will simulate a blockchain node on a separate port.  
-**Leave all terminals open and running.**
+#### **Option 2: Advanced – Geth Clique Network (for consensus, optional)**
 
-### C. Deploy Smart Contracts to Each Node
+- Initialize a Clique PoA network with 3-4 real nodes using [Geth](https://geth.ethereum.org/docs/interface/private-network).
+- More complex, but closer to a real-world decentralized network.
 
-In a new terminal, for each node (change port as needed):
+### C. Compile and Deploy Contracts to Each Node
+
+- In `contracts/scripts/deploy.js`, write a deploy script for your contracts (e.g., FileRegistry).
+- Deploy to each node:
 
 ```bash
-cd contracts
 npx hardhat compile
+
+# For each node (change URL for each)
 npx hardhat run --network localhost --url http://127.0.0.1:8545 scripts/deploy.js
 npx hardhat run --network localhost --url http://127.0.0.1:8546 scripts/deploy.js
 npx hardhat run --network localhost --url http://127.0.0.1:8547 scripts/deploy.js
-# etc.
+npx hardhat run --network localhost --url http://127.0.0.1:8548 scripts/deploy.js
 ```
-*(Edit `scripts/deploy.js` to deploy your contract, e.g., `FileRegistry.sol`.)*
+
+- Keep track of deployed contract addresses for each node.
 
 ---
 
-## 4. Setup: 3 Local IPFS Nodes with Docker
+## 3. IPFS Node Setup (3 Nodes with Docker)
 
-In a terminal, run:
+### A. Launch IPFS Nodes
+
+In a new terminal, run:
 
 ```bash
 docker run -d --name ipfs0 -p 5001:5001 -p 8080:8080 ipfs/go-ipfs
@@ -86,25 +99,17 @@ docker run -d --name ipfs1 -p 5002:5001 -p 8081:8080 ipfs/go-ipfs
 docker run -d --name ipfs2 -p 5003:5001 -p 8082:8080 ipfs/go-ipfs
 ```
 
-### A. Confirm IPFS Nodes Are Running
+### B. Verify and Peer IPFS Nodes
 
-```bash
-docker ps
-```
-You should see `ipfs0`, `ipfs1`, and `ipfs2`.
-
-### B. Get Peer Addresses
+1. Get node IDs and multiaddresses:
 
 ```bash
 docker exec -it ipfs0 ipfs id
 docker exec -it ipfs1 ipfs id
 docker exec -it ipfs2 ipfs id
 ```
-Save the `ID` and `Addresses` for each.
 
-### C. Peer the Nodes
-
-Connect all nodes to each other (replace `<multiaddress>` as appropriate):
+2. Peer the nodes (connect each to the others):
 
 ```bash
 docker exec -it ipfs0 ipfs swarm connect <ipfs1_multiaddress>
@@ -115,24 +120,18 @@ docker exec -it ipfs2 ipfs swarm connect <ipfs0_multiaddress>
 docker exec -it ipfs2 ipfs swarm connect <ipfs1_multiaddress>
 ```
 
-### D. Test File Replication
-
-Add a file with:
+3. Test file replication:
 
 ```bash
 docker exec -it ipfs0 ipfs add /etc/hosts
-```
-Copy the CID and check on other nodes:
-
-```bash
+# Get CID
 docker exec -it ipfs1 ipfs cat <CID>
 docker exec -it ipfs2 ipfs cat <CID>
 ```
-You should see the file content, confirming replication.
 
 ---
 
-## 5. Setup: Backend Orchestrator (Node.js)
+## 4. Backend Orchestrator Setup (Node.js)
 
 ### A. Initialize Backend
 
@@ -142,9 +141,9 @@ npm init -y
 npm install express axios dotenv cors
 ```
 
-### B. Create API Server
+### B. Implement API Server
 
-**Create `index.js`:**
+1. **Create `index.js`:**
 
 ```javascript name=backend/index.js
 const express = require('express');
@@ -170,7 +169,7 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
 ```
 
-**Create `virusTotal.js`:**
+2. **Create `virusTotal.js`:**
 
 ```javascript name=backend/virusTotal.js
 const axios = require('axios');
@@ -197,7 +196,7 @@ const scanFileWithVirusTotal = async (fileBase64) => {
 module.exports = { scanFileWithVirusTotal };
 ```
 
-**Create `.env`:**
+3. **Add `.env`:**
 
 ```
 VIRUSTOTAL_API_KEY=your_virustotal_api_key_here
@@ -211,11 +210,12 @@ node index.js
 
 ---
 
-## 6. Integration and Testing
+## 5. Integration Workflows
 
-### A. Upload a File to IPFS
+### A. File Upload & IPFS Storage
 
-**Example Node.js script:**
+- Write a Node.js script (or use Postman) to upload a file to an IPFS node using its HTTP API.
+- Example:
 
 ```javascript name=infra/ipfs-upload.js
 const axios = require('axios');
@@ -233,22 +233,22 @@ async function uploadToIpfs(filePath, ipfsApiUrl) {
   return res.data.Hash; // The CID
 }
 
-// Usage:
+// Usage
 uploadToIpfs('my-encrypted-file.bin', 'http://localhost:5001')
   .then(cid => console.log('File uploaded to IPFS with CID:', cid));
 ```
 
-### B. Register CID in Smart Contract
+### B. Register CID on Blockchain
 
-- Use `ethers.js` to call your contract (connect to each node’s endpoint as needed).
+- Use `ethers.js` in a script to interact with your deployed contract on the specific node/port.
 
-### C. Scan File with VirusTotal via Backend
+### C. Malware Scanning
 
-- Send the encrypted file as base64 to backend `/api/scan` endpoint.
+- Send the file (base64) to the backend’s `/api/scan` endpoint and store the scan result/status in your contract.
 
 ---
 
-## 7. Node Topology
+## 6. Node Map/Network Topology
 
 | Node Type     | Name    | Ports                | Purpose                                  |
 |---------------|---------|----------------------|------------------------------------------|
@@ -263,23 +263,42 @@ uploadToIpfs('my-encrypted-file.bin', 'http://localhost:5001')
 
 ---
 
+## 7. Testing & Verification
+
+- **Hardhat nodes:** Confirm each node is running and contracts are deployed.
+- **IPFS nodes:** Confirm all nodes are peered and files replicate.
+- **Backend:** Confirm `/api/scan` endpoint works with a test file.
+- **Integration:**  
+  - Upload a file to IPFS, get CID.
+  - Register CID and scan status in contract (on each node).
+  - Retrieve and verify file and scan status via script.
+
+---
+
 ## 8. Troubleshooting
 
-- **Docker:** Use `docker ps` to check containers, `docker logs <container>` for errors.
-- **IPFS:** Double-check peer addresses and firewall settings if nodes don’t connect/replicate.
-- **Hardhat:** Ensure each node has a unique port. If you want advanced consensus between nodes, consider Geth/Parity with Clique PoA.
-- **Backend:** Verify `.env` and API key.
+- **Docker:** Use `docker ps`/`docker logs` to check containers.
+- **IPFS:** Use `ipfs swarm peers` to verify peering.
+- **Hardhat:** Make sure each node uses a unique port.
+- **Backend:** Ensure VIRUSTOTAL_API_KEY is set and valid.
 
 ---
 
-## 9. Checklist
+## 9. Documentation
 
-- [ ] 3-4 Hardhat blockchain nodes running on separate ports.
-- [ ] 3 IPFS nodes running, peered, and replicating files.
-- [ ] Backend orchestrator running and responding to scan requests.
-- [ ] Can upload to IPFS, register CID in contract, and get scan result from backend.
+- Update `README.md` in each directory with setup and usage.
+- Document API endpoints, contract addresses, peer addresses.
+- Add diagrams of the network topology for clarity.
 
 ---
 
-**Phase 2 complete!  
-You are now ready for contract development, integration, and full workflow in Phase 3.**
+## 10. Deliverables for Phase 2
+
+- [ ] All blockchain and IPFS nodes running locally
+- [ ] Backend orchestrator operational
+- [ ] End-to-end test: file upload, scan, registration, and audit
+- [ ] Documentation for setup, scripts, and integration
+
+---
+
+**With Phase 2 complete, your team is ready to implement core business logic, permissions, and full end-to-end flows in Phase 3.**
